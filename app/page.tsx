@@ -29,7 +29,7 @@ export default function JoyTracker() {
   const categories: Category[] = [
     { id: 'coffee', name: 'Coffee & Tea', icon: Coffee, color: 'bg-slate-600' },
     { id: 'meals', name: 'Meals', icon: UtensilsCrossed, color: 'bg-slate-500' },
-    { id: 'content', name: 'Books & Music', icon: BookOpen, color: 'bg-blue-600' },
+    { id: 'content', name: 'Books, Content, & Music', icon: BookOpen, color: 'bg-blue-600' },
     { id: 'projects', name: 'Fun Projects', icon: Smile, color: 'bg-indigo-600' },
     { id: 'exercise', name: 'Exercise', icon: Dumbbell, color: 'bg-cyan-600' },
     { id: 'nature', name: 'Nature & Places', icon: Trees, color: 'bg-teal-600' },
