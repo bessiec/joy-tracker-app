@@ -117,17 +117,12 @@ export default function JoyTracker() {
 
   const formatDate = (timestamp: string) => {
     const date = new Date(timestamp);
-    const today = new Date();
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
-
-    if (date.toDateString() === today.toDateString()) {
-      return `Today at ${date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`;
-    } else if (date.toDateString() === yesterday.toDateString()) {
-      return `Yesterday at ${date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`;
-    } else {
-      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
-    }
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const year = String(date.getFullYear()).slice(-2);
+    const time = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+    
+    return `${month}-${day}-${year} at ${time}`;
   };
 
   const getStats = () => {
