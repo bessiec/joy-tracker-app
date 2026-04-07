@@ -3,15 +3,30 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Coffee, UtensilsCrossed, BookOpen, Smile, Dumbbell, Trees, Calendar, TrendingUp, X, Edit2 } from 'lucide-react';
 
-export default function JoyTracker() {
-  const [entries, setEntries] = useState([]);
-  const [showModal, setShowModal] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState(null);
-  const [notes, setNotes] = useState('');
-  const [view, setView] = useState('timeline'); // timeline or stats
-  const [editingEntry, setEditingEntry] = useState(null); // for editing existing entries
+// Type definitions
+interface Category {
+  id: string;
+  name: string;
+  icon: React.ComponentType<{ className?: string }>;
+  color: string;
+}
 
-  const categories = [
+interface Entry {
+  id: number;
+  category: string;
+  timestamp: string;
+  notes: string;
+}
+
+export default function JoyTracker() {
+  const [entries, setEntries] = useState<Entry[]>([]);
+  const [showModal, setShowModal] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
+  const [notes, setNotes] = useState('');
+  const [view, setView] = useState<'timeline' | 'stats'>('timeline');
+  const [editingEntry, setEditingEntry] = useState<Entry | null>(null);
+
+  const categories: Category[] = [
     { id: 'coffee', name: 'Coffee & Tea', icon: Coffee, color: 'bg-slate-600' },
     { id: 'meals', name: 'Meals', icon: UtensilsCrossed, color: 'bg-slate-500' },
     { id: 'content', name: 'Books & Music', icon: BookOpen, color: 'bg-blue-600' },
@@ -37,7 +52,7 @@ export default function JoyTracker() {
     }
   }, [entries]);
 
-  const openModal = (category) => {
+  const openModal = (category: Category) => {
     setSelectedCategory(category);
     setShowModal(true);
   };
@@ -49,8 +64,8 @@ export default function JoyTracker() {
     setEditingEntry(null);
   };
 
-  const quickLog = (category) => {
-    const newEntry = {
+  const quickLog = (category: Category) => {
+    const newEntry: Entry = {
       id: Date.now(),
       category: category.id,
       timestamp: new Date().toISOString(),
@@ -71,7 +86,7 @@ export default function JoyTracker() {
       ));
     } else {
       // Create new entry
-      const newEntry = {
+      const newEntry: Entry = {
         id: Date.now(),
         category: selectedCategory.id,
         timestamp: new Date().toISOString(),
@@ -82,21 +97,25 @@ export default function JoyTracker() {
     closeModal();
   };
 
-  const deleteEntry = (id) => {
+  const deleteEntry = (id: number) => {
     setEntries(entries.filter(e => e.id !== id));
   };
 
-  const editEntry = (entry) => {
+  const editEntry = (entry: Entry) => {
     const category = getCategoryById(entry.category);
-    setSelectedCategory(category);
-    setNotes(entry.notes || '');
-    setEditingEntry(entry);
-    setShowModal(true);
+    if (category) {
+      setSelectedCategory(category);
+      setNotes(entry.notes || '');
+      setEditingEntry(entry);
+      setShowModal(true);
+    }
   };
 
-  const getCategoryById = (id) => categories.find(c => c.id === id);
+  const getCategoryById = (id: string): Category | undefined => {
+    return categories.find(c => c.id === id);
+  };
 
-  const formatDate = (timestamp) => {
+  const formatDate = (timestamp: string) => {
     const date = new Date(timestamp);
     const today = new Date();
     const yesterday = new Date(today);
@@ -119,7 +138,7 @@ export default function JoyTracker() {
       return entryDate >= weekAgo;
     });
 
-    const categoryCounts = {};
+    const categoryCounts: Record<string, number> = {};
     categories.forEach(cat => {
       categoryCounts[cat.id] = last7Days.filter(e => e.category === cat.id).length;
     });
@@ -141,7 +160,7 @@ export default function JoyTracker() {
   const copyDataToClipboard = () => {
     const readableData = entries.map(entry => {
       const category = getCategoryById(entry.category);
-      return `${formatDate(entry.timestamp)} - ${category.name}${entry.notes ? '\n  ' + entry.notes : ''}`;
+      return `${formatDate(entry.timestamp)} - ${category?.name}${entry.notes ? '\n  ' + entry.notes : ''}`;
     }).join('\n\n');
     
     navigator.clipboard.writeText(readableData).then(() => {
@@ -258,6 +277,7 @@ export default function JoyTracker() {
             ) : (
               entries.map(entry => {
                 const category = getCategoryById(entry.category);
+                if (!category) return null;
                 const Icon = category.icon;
                 return (
                   <div
