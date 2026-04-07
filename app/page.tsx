@@ -25,6 +25,7 @@ export default function JoyTracker() {
   const [notes, setNotes] = useState('');
   const [view, setView] = useState<'timeline' | 'stats'>('timeline');
   const [editingEntry, setEditingEntry] = useState<Entry | null>(null);
+  const [customDate, setCustomDate] = useState('');
 
   const categories: Category[] = [
     { id: 'coffee', name: 'Coffee & Tea', icon: Coffee, color: 'bg-slate-600' },
@@ -54,6 +55,14 @@ export default function JoyTracker() {
 
   const openModal = (category: Category) => {
     setSelectedCategory(category);
+    // Set default date/time to now in datetime-local format
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    setCustomDate(`${year}-${month}-${day}T${hours}:${minutes}`);
     setShowModal(true);
   };
 
@@ -62,6 +71,7 @@ export default function JoyTracker() {
     setSelectedCategory(null);
     setNotes('');
     setEditingEntry(null);
+    setCustomDate('');
   };
 
   const quickLog = (category: Category) => {
@@ -77,11 +87,14 @@ export default function JoyTracker() {
   const saveEntry = () => {
     if (!selectedCategory) return;
     
+    // Use custom date if provided, otherwise use current time
+    const timestamp = customDate ? new Date(customDate).toISOString() : new Date().toISOString();
+    
     if (editingEntry) {
       // Update existing entry
       setEntries(entries.map(entry => 
         entry.id === editingEntry.id 
-          ? { ...entry, notes: notes.trim() }
+          ? { ...entry, notes: notes.trim(), timestamp: timestamp }
           : entry
       ));
     } else {
@@ -89,10 +102,12 @@ export default function JoyTracker() {
       const newEntry: Entry = {
         id: Date.now(),
         category: selectedCategory.id,
-        timestamp: new Date().toISOString(),
+        timestamp: timestamp,
         notes: notes.trim(),
       };
-      setEntries([newEntry, ...entries]);
+      setEntries([newEntry, ...entries].sort((a, b) => 
+        new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+      ));
     }
     closeModal();
   };
@@ -107,6 +122,16 @@ export default function JoyTracker() {
       setSelectedCategory(category);
       setNotes(entry.notes || '');
       setEditingEntry(entry);
+      
+      // Convert entry timestamp to datetime-local format
+      const date = new Date(entry.timestamp);
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const hours = String(date.getHours()).padStart(2, '0');
+      const minutes = String(date.getMinutes()).padStart(2, '0');
+      setCustomDate(`${year}-${month}-${day}T${hours}:${minutes}`);
+      
       setShowModal(true);
     }
   };
@@ -380,6 +405,18 @@ export default function JoyTracker() {
                 <button onClick={closeModal} className="text-gray-500 hover:text-gray-700">
                   <X className="w-6 h-6" />
                 </button>
+              </div>
+
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Date & Time
+                </label>
+                <input
+                  type="datetime-local"
+                  value={customDate}
+                  onChange={(e) => setCustomDate(e.target.value)}
+                  className="w-full border-2 border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900"
+                />
               </div>
 
               <textarea
