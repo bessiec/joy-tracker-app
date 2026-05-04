@@ -28,7 +28,7 @@ export default function JoyTracker() {
   const [customDate, setCustomDate] = useState('');
   const [timePeriod, setTimePeriod] = useState<'week' | 'month' | 'allTime'>('week');
   const [showExportModal, setShowExportModal] = useState(false);
-  const [exportRange, setExportRange] = useState<'week' | 'month' | 'allTime'>('allTime');
+  const [exportRange, setExportRange] = useState<'week' | 'month' | 'allTime' | 'custom'>('allTime');
   const [exportStartDate, setExportStartDate] = useState('');
   const [exportEndDate, setExportEndDate] = useState('');
 
