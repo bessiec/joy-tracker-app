@@ -26,6 +26,11 @@ export default function JoyTracker() {
   const [view, setView] = useState<'timeline' | 'stats'>('timeline');
   const [editingEntry, setEditingEntry] = useState<Entry | null>(null);
   const [customDate, setCustomDate] = useState('');
+  const [timePeriod, setTimePeriod] = useState<'week' | 'month' | 'allTime'>('week');
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exportRange, setExportRange] = useState<'week' | 'month' | 'allTime'>('allTime');
+  const [exportStartDate, setExportStartDate] = useState('');
+  const [exportEndDate, setExportEndDate] = useState('');
 
   const categories: Category[] = [
     { id: 'coffee', name: 'Coffee & Tea', icon: Coffee, color: 'bg-slate-600' },
@@ -151,23 +156,63 @@ export default function JoyTracker() {
   };
 
   const getStats = () => {
-    const last7Days = entries.filter(e => {
-      const entryDate = new Date(e.timestamp);
-      const weekAgo = new Date();
+    const now = new Date();
+    const weekAgo = new Date(now);
+    weekAgo.setDate(weekAgo.getDate() - 7);
+    const monthAgo = new Date(now);
+    monthAgo.setMonth(monthAgo.getMonth() - 1);
+
+    const last7Days = entries.filter(e => new Date(e.timestamp) >= weekAgo);
+    const lastMonth = entries.filter(e => new Date(e.timestamp) >= monthAgo);
+    const allTime = entries;
+
+    const getCategoryCounts = (entryList: Entry[]) => {
+      const counts: Record<string, number> = {};
+      categories.forEach(cat => {
+        counts[cat.id] = entryList.filter(e => e.category === cat.id).length;
+      });
+      return counts;
+    };
+
+    return {
+      week: { total: last7Days.length, byCategory: getCategoryCounts(last7Days) },
+      month: { total: lastMonth.length, byCategory: getCategoryCounts(lastMonth) },
+      allTime: { total: allTime.length, byCategory: getCategoryCounts(allTime) }
+    };
+  };
+
+  const getFilteredEntries = () => {
+    if (exportRange === 'allTime') return entries;
+    
+    if (exportRange === 'custom' && exportStartDate && exportEndDate) {
+      const start = new Date(exportStartDate);
+      const end = new Date(exportEndDate);
+      end.setHours(23, 59, 59, 999); // Include entire end date
+      return entries.filter(e => {
+        const entryDate = new Date(e.timestamp);
+        return entryDate >= start && entryDate <= end;
+      });
+    }
+    
+    const now = new Date();
+    if (exportRange === 'week') {
+      const weekAgo = new Date(now);
       weekAgo.setDate(weekAgo.getDate() - 7);
-      return entryDate >= weekAgo;
-    });
-
-    const categoryCounts: Record<string, number> = {};
-    categories.forEach(cat => {
-      categoryCounts[cat.id] = last7Days.filter(e => e.category === cat.id).length;
-    });
-
-    return { total: last7Days.length, byCategory: categoryCounts };
+      return entries.filter(e => new Date(e.timestamp) >= weekAgo);
+    }
+    
+    if (exportRange === 'month') {
+      const monthAgo = new Date(now);
+      monthAgo.setMonth(monthAgo.getMonth() - 1);
+      return entries.filter(e => new Date(e.timestamp) >= monthAgo);
+    }
+    
+    return entries;
   };
 
   const exportData = () => {
-    const dataStr = JSON.stringify(entries, null, 2);
+    const entriesToExport = getFilteredEntries();
+    const dataStr = JSON.stringify(entriesToExport, null, 2);
     const dataBlob = new Blob([dataStr], { type: 'application/json' });
     const url = URL.createObjectURL(dataBlob);
     const link = document.createElement('a');
@@ -175,16 +220,19 @@ export default function JoyTracker() {
     link.download = `joy-tracker-export-${new Date().toISOString().split('T')[0]}.json`;
     link.click();
     URL.revokeObjectURL(url);
+    setShowExportModal(false);
   };
 
   const copyDataToClipboard = () => {
-    const readableData = entries.map(entry => {
+    const entriesToExport = getFilteredEntries();
+    const readableData = entriesToExport.map(entry => {
       const category = getCategoryById(entry.category);
       return `${formatDate(entry.timestamp)} - ${category?.name}${entry.notes ? '\n  ' + entry.notes : ''}`;
     }).join('\n\n');
     
     navigator.clipboard.writeText(readableData).then(() => {
-      alert('Data copied to clipboard! You can paste it into Google Docs.');
+      alert(`Copied ${entriesToExport.length} entries to clipboard!`);
+      setShowExportModal(false);
     }).catch(err => {
       console.error('Failed to copy:', err);
       alert('Failed to copy. Try the JSON export instead.');
@@ -208,24 +256,14 @@ export default function JoyTracker() {
           {entries.length > 0 && (
             <div className="flex justify-center gap-2 mt-4">
               <button
-                onClick={copyDataToClipboard}
+                onClick={() => setShowExportModal(true)}
                 className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 font-medium text-sm flex items-center gap-2"
-                title="Copy data as text for Google Docs"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                </svg>
-                Copy Data
-              </button>
-              <button
-                onClick={exportData}
-                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 font-medium text-sm flex items-center gap-2"
-                title="Export as JSON file"
+                title="Export your data"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                 </svg>
-                Export JSON
+                Export Data
               </button>
             </div>
           )}
@@ -342,41 +380,177 @@ export default function JoyTracker() {
             )}
           </div>
         ) : (
-          <div className="bg-white rounded-2xl shadow-lg p-6">
-            <h2 className="text-2xl font-bold text-gray-800 mb-2">Past 7 Days</h2>
-            <p className="text-gray-600 mb-6">You logged <span className="font-bold text-2xl text-blue-600">{stats.total}</span> joy moments</p>
-            
-            <div className="space-y-4">
-              {categories.map(category => {
-                const count = stats.byCategory[category.id] || 0;
-                const Icon = category.icon;
-                const percentage = stats.total > 0 ? (count / stats.total) * 100 : 0;
-                
-                return (
-                  <div key={category.id}>
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        <div className={`${category.color} rounded-lg p-2`}>
-                          <Icon className="w-4 h-4 text-white" />
-                        </div>
-                        <span className="font-medium text-gray-700">{category.name}</span>
-                      </div>
-                      <span className="text-lg font-bold text-gray-800">{count}</span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div
-                        className={`${category.color} h-2 rounded-full transition-all duration-500`}
-                        style={{ width: `${percentage}%` }}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
+          <div className="space-y-6">
+            {/* Time Period Selector */}
+            <div className="flex justify-center gap-2">
+              <button
+                onClick={() => setTimePeriod('week')}
+                className={`px-4 py-2 rounded-lg font-medium transition-all ${
+                  timePeriod === 'week'
+                    ? 'bg-white text-gray-800 shadow-md'
+                    : 'text-gray-600 hover:text-gray-800'
+                }`}
+              >
+                Past 7 Days
+              </button>
+              <button
+                onClick={() => setTimePeriod('month')}
+                className={`px-4 py-2 rounded-lg font-medium transition-all ${
+                  timePeriod === 'month'
+                    ? 'bg-white text-gray-800 shadow-md'
+                    : 'text-gray-600 hover:text-gray-800'
+                }`}
+              >
+                Past Month
+              </button>
+              <button
+                onClick={() => setTimePeriod('allTime')}
+                className={`px-4 py-2 rounded-lg font-medium transition-all ${
+                  timePeriod === 'allTime'
+                    ? 'bg-white text-gray-800 shadow-md'
+                    : 'text-gray-600 hover:text-gray-800'
+                }`}
+              >
+                All Time
+              </button>
             </div>
 
-            {stats.total === 0 && (
-              <div className="text-center py-8">
-                <p className="text-gray-500">Start logging to see your patterns!</p>
+            {/* Summary Stats */}
+            <div className="bg-white rounded-2xl shadow-lg p-6">
+              <h2 className="text-2xl font-bold text-gray-800 mb-2">
+                {timePeriod === 'week' ? 'Past 7 Days' : timePeriod === 'month' ? 'Past Month' : 'All Time'}
+              </h2>
+              <p className="text-gray-600 mb-6">
+                You logged <span className="font-bold text-2xl text-blue-600">{stats[timePeriod].total}</span> joy moments
+              </p>
+              
+              <div className="space-y-4">
+                {categories.map(category => {
+                  const count = stats[timePeriod].byCategory[category.id] || 0;
+                  const Icon = category.icon;
+                  const percentage = stats[timePeriod].total > 0 ? (count / stats[timePeriod].total) * 100 : 0;
+                  
+                  return (
+                    <div key={category.id}>
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <div className={`${category.color} rounded-lg p-2`}>
+                            <Icon className="w-4 h-4 text-white" />
+                          </div>
+                          <span className="font-medium text-gray-700">{category.name}</span>
+                        </div>
+                        <span className="text-lg font-bold text-gray-800">{count}</span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div
+                          className={`${category.color} h-2 rounded-full transition-all duration-500`}
+                          style={{ width: `${percentage}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {stats[timePeriod].total === 0 && (
+                <div className="text-center py-8">
+                  <p className="text-gray-500">No entries for this period</p>
+                </div>
+              )}
+            </div>
+
+            {/* Patterns & Insights */}
+            {stats[timePeriod].total > 0 && (
+              <div className="bg-white rounded-2xl shadow-lg p-6">
+                <h3 className="text-xl font-bold text-gray-800 mb-4">Patterns</h3>
+                
+                {/* Top Joy Source */}
+                <div className="mb-4 p-4 bg-blue-50 rounded-lg">
+                  <p className="text-sm text-gray-600 mb-1">Your top joy source</p>
+                  <p className="text-lg font-semibold text-gray-800">
+                    {(() => {
+                      const topCategory = Object.entries(stats[timePeriod].byCategory)
+                        .sort(([,a], [,b]) => b - a)[0];
+                      if (!topCategory || topCategory[1] === 0) return 'No entries yet';
+                      const cat = categories.find(c => c.id === topCategory[0]);
+                      return `${cat?.name} (${topCategory[1]} ${topCategory[1] === 1 ? 'moment' : 'moments'})`;
+                    })()}
+                  </p>
+                </div>
+
+                {/* Current Streak - Only show for all time */}
+                {timePeriod === 'allTime' && (
+                  <div className="mb-4 p-4 bg-green-50 rounded-lg">
+                    <p className="text-sm text-gray-600 mb-1">Current streak</p>
+                    <p className="text-lg font-semibold text-gray-800">
+                      {(() => {
+                        if (entries.length === 0) return '0 days';
+                        const sortedEntries = [...entries].sort((a, b) => 
+                          new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+                        );
+                        
+                        const today = new Date();
+                        today.setHours(0, 0, 0, 0);
+                        
+                        let streak = 0;
+                        let currentDate = new Date(today);
+                        
+                        const uniqueDays = new Set<string>();
+                        for (const entry of sortedEntries) {
+                          const entryDate = new Date(entry.timestamp);
+                          entryDate.setHours(0, 0, 0, 0);
+                          uniqueDays.add(entryDate.toISOString());
+                        }
+                        
+                        const sortedDays = Array.from(uniqueDays).sort().reverse();
+                        
+                        for (const day of sortedDays) {
+                          const dayDate = new Date(day);
+                          if (dayDate.getTime() === currentDate.getTime()) {
+                            streak++;
+                            currentDate.setDate(currentDate.getDate() - 1);
+                          } else if (dayDate.getTime() < currentDate.getTime()) {
+                            break;
+                          }
+                        }
+                        
+                        return `${streak} ${streak === 1 ? 'day' : 'days'}`;
+                      })()}
+                    </p>
+                  </div>
+                )}
+
+                {/* Total for period */}
+                <div className="p-4 bg-purple-50 rounded-lg">
+                  <p className="text-sm text-gray-600 mb-1">
+                    {timePeriod === 'allTime' ? 'Total joy moments logged' : 'Joy moments this period'}
+                  </p>
+                  <p className="text-lg font-semibold text-gray-800">{stats[timePeriod].total}</p>
+                </div>
+              </div>
+            )}
+
+            {/* AI Analysis Button - Demo */}
+            {stats.allTime.total >= 5 && (
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl shadow-lg p-6 border-2 border-blue-200">
+                <div className="flex items-start gap-4">
+                  <div className="bg-blue-600 rounded-full p-3">
+                    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                    </svg>
+                  </div>
+                  <div className="flex-grow">
+                    <h3 className="text-xl font-bold text-gray-800 mb-2">AI Insights</h3>
+                    <p className="text-gray-600 mb-4">Get personalized insights about your joy patterns using AI analysis</p>
+                    <button 
+                      onClick={() => alert('Demo Mode: In the self-hosted version, this uses Claude API to analyze your patterns. See the tutorial to set up your own!')}
+                      className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 font-medium shadow-md"
+                    >
+                      View Sample Analysis
+                    </button>
+                    <p className="text-xs text-gray-500 mt-2">Demo mode - see tutorial to enable with your data</p>
+                  </div>
+                </div>
               </div>
             )}
           </div>
@@ -440,6 +614,121 @@ export default function JoyTracker() {
                   className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium shadow-md"
                 >
                   Save
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Export Modal */}
+        {showExportModal && (
+          <div className="fixed inset-0 bg-white/30 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 border-2 border-gray-200">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-xl font-bold text-gray-900">Export Your Data</h3>
+                <button onClick={() => setShowExportModal(false)} className="text-gray-500 hover:text-gray-700">
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-3">
+                  Select time range
+                </label>
+                
+                <div className="space-y-2">
+                  <label className="flex items-center p-3 border-2 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
+                    <input
+                      type="radio"
+                      name="exportRange"
+                      value="week"
+                      checked={exportRange === 'week'}
+                      onChange={(e) => setExportRange(e.target.value as 'week' | 'month' | 'allTime')}
+                      className="mr-3"
+                    />
+                    <span className="text-gray-800">Past 7 Days</span>
+                  </label>
+                  
+                  <label className="flex items-center p-3 border-2 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
+                    <input
+                      type="radio"
+                      name="exportRange"
+                      value="month"
+                      checked={exportRange === 'month'}
+                      onChange={(e) => setExportRange(e.target.value as 'week' | 'month' | 'allTime')}
+                      className="mr-3"
+                    />
+                    <span className="text-gray-800">Past Month</span>
+                  </label>
+                  
+                  <label className="flex items-center p-3 border-2 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
+                    <input
+                      type="radio"
+                      name="exportRange"
+                      value="allTime"
+                      checked={exportRange === 'allTime'}
+                      onChange={(e) => setExportRange(e.target.value as 'week' | 'month' | 'allTime')}
+                      className="mr-3"
+                    />
+                    <span className="text-gray-800">All Time</span>
+                  </label>
+                  
+                  <label className="flex items-start p-3 border-2 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
+                    <input
+                      type="radio"
+                      name="exportRange"
+                      value="custom"
+                      checked={exportRange === 'custom'}
+                      onChange={(e) => setExportRange(e.target.value as any)}
+                      className="mr-3 mt-1"
+                    />
+                    <div className="flex-grow">
+                      <span className="text-gray-800 block mb-2">Custom Range</span>
+                      {exportRange === 'custom' && (
+                        <div className="space-y-2">
+                          <input
+                            type="date"
+                            value={exportStartDate}
+                            onChange={(e) => setExportStartDate(e.target.value)}
+                            className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
+                            placeholder="Start date"
+                          />
+                          <input
+                            type="date"
+                            value={exportEndDate}
+                            onChange={(e) => setExportEndDate(e.target.value)}
+                            className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
+                            placeholder="End date"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </label>
+                </div>
+
+                <p className="text-sm text-gray-500 mt-3">
+                  {getFilteredEntries().length} {getFilteredEntries().length === 1 ? 'entry' : 'entries'} will be exported
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <button
+                  onClick={copyDataToClipboard}
+                  className="w-full bg-gray-100 text-gray-700 px-4 py-3 rounded-lg hover:bg-gray-200 font-medium flex items-center justify-center gap-2"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                  </svg>
+                  Copy as Text
+                </button>
+                <button
+                  onClick={exportData}
+                  className="w-full bg-blue-600 text-white px-4 py-3 rounded-lg hover:bg-blue-700 font-medium flex items-center justify-center gap-2 shadow-md"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                  Download JSON
                 </button>
               </div>
             </div>
