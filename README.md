@@ -178,8 +178,7 @@ Want to sync across devices? Add Supabase:
 
 ## The Build Process
 
-This app was built entirely through conversation with Claude AI. The full conversation history, including every prompt and iteration, is available in [`CONVERSATION.md`](CONVERSATION.md).
-
+This app was built entirely through conversation with Claude AI. 
 **Key learnings:**
 - Start simple, iterate based on use
 - Be specific in prompts (describe current + desired behavior)

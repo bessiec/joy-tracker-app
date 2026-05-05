@@ -435,7 +435,7 @@ export default function DemoPage() {
                   Start Your Own Tracker →
                 </a>
                 <a 
-                  href="https://github.com/yourusername/joy-tracker" 
+                  href="https://bessiechu.wordpress.com/2026/05/04/from-idea-to-a-deployed-app-in-one-conversation/" 
                   className="inline-block bg-white text-yellow-900 px-4 py-2 rounded-lg hover:bg-gray-50 font-medium text-sm border-2 border-yellow-400"
                 >
                   View Tutorial
